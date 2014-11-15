@@ -190,23 +190,43 @@ class Firewall:
             else:
                 return False 
 
-    def binary_search(self, array, pkt_address):
-        mid = len(array)/2
+def binary_search(self, array, pkt_address):
+        if len(array) == 0:
+            return False
+
+        mid = int(len(array)/2)
         split_pkt_address = pkt_address.split('.')
         pkt_address_num = ''
-        
+        #packet ip address
         for x in split_pkt_address:
-            pkt_address += x
-        split_mid_packet = array[mid].split('.')
-        for x in split_pkt_address
+            pkt_address_num += x
 
-        count = 0
-        while count < len(split_pkt_address):
-            if int(split_pkt_address[count]) < int(split_mid_packet[count]):
-                self.binary_search(array[0:mid], pkt_address)
-            elif int(split_pkt_address[count]) > int(split_mid_packet[count]):
-                for x in 
+        mid_start = array[mid][0]
+        mid_end = array[mid][1]
 
+        #middle array start address
+        mid_start_split = mid_start.split('.')
+        mid_start_num = ''
+        for x in mid_start_split:
+            mid_start_num += x
+
+        #middle array end address
+        mid_end_split = mid_end.split('.')
+        mid_end_num = ''
+        for x in mid_end_split:
+            mid_end_num += x
+
+        # check if it has been found
+        if int(pkt_address_num) >= int(mid_start_num) and int(pkt_address_num) =< int(mid_end_num):
+            return True
+        # smaller than the start range
+        elif int(pkt_address_num) < int(mid_start_num):
+            return self.binary_search(array[0:mid], pkt_address)
+        # greater than end range
+        elif int(pkt_address_num) > int(mid_end_num):
+            return self.binary_search(array[mid:], pkt_address)
+        else:
+            return False
 
 
 
