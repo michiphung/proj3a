@@ -41,22 +41,20 @@ class Firewall:
             else:
                 pass
 
-        print self.drop_rules
-        print self.pass_rules
-
         parser.close()
 
         poop = open('geoipdb.txt')
         for line in poop:
             split = line.split()
-            if self.geo.has_key(split[2]):
-                self.geo[split[2].lower()].append(split[0:2])
+            if self.geo.has_key(split[2].lower()):
+                self.geo[split[2].lower()].append([split[0], split[1]])
             else:
                 self.geo[split[2].lower()] = [[split[0], split[1]]]
         poop.close()
 
-            # TODO: Load the GeoIP DB ('geoipdb.txt') as well.
-        # TODO: Also do some initialization if needed.
+        # for x in range (0, len(self.geo['au'])/10):
+        #     print self.geo['au'][x]
+
 
     # @pkt_dir: either PKT_DIR_INCOMING or PKT_DIR_OUTGOING
     # @pkt: the actual data of the IPv4 packet (including IP header)
@@ -126,7 +124,6 @@ class Firewall:
                 qtype, = struct.unpack('!H', pkt[q_name_start+1:q_name_start+3])
                 qclass, = struct.unpack('!H', pkt[q_name_start+3:q_name_start+5])
                 if qd_count == 1 and (qtype == 1 or qtype == 28) and qclass == 1:
-                    print 'packet is coming from'
                     self.check_dns(dns_parse, pkt_dir, pkt)
                 else:
                     checker = (prot, external_ip, port)
@@ -152,47 +149,42 @@ class Firewall:
         line_number = 0
         to_send = True
         for key in self.drop_rules:
-            if key[0] == tup[0]: # checks if the protocol matches
-                port_split = key[2].split('-')
-                # checks if port is any, equal or in range 
-                if len(port_split) == 2:
-                    if int(tup[2]) < int(port_split[1]) and int(tup[2]) > int(port_split[0]):
-                        if (self.check_ext_ip(key[1], tup[1])) == True:
-                            if self.drop_rules[key] > line_number:
-                                line_number = self.drop_rules[key]
-                                to_send = False
-                else: 
-                    if port_split[0] == 'any' or port_split[0] == tup[2]:
-                        if (self.check_ext_ip(key[1], tup[1])) == True:
-                            if self.drop_rules[key] > line_number:
-                                line_number = self.drop_rules[key]
-                                to_send = False
+            port_split = key[2].split('-')
+            if len(port_split) == 2:
+                if (int(tup[2]) <= int(port_split[1]) and int(tup[2]) >= int(port_split[0])) and (self.check_ext_ip(key[1], tup[1]) == True) and (key[0] == tup[0]):
+                    if self.drop_rules[key] > line_number:
+                        line_number = self.drop_rules[key]
+                        to_send = False
+            else: 
+                if (port_split[0] == 'any' or int(port_split[0]) == tup[2]) and (self.check_ext_ip(key[1], tup[1]) == True) and (key[0] == tup[0]):
+                    if self.drop_rules[key] > line_number:
+                        line_number = self.drop_rules[key]
+                        to_send = False
 
         for key in self.pass_rules:
-            if key[0] == tup[0]: # checks if the protocol matches
-                port_split = key[2].split('-')
-                # checks if port is any, equal or in range
-                if len(port_split) == 2:
-                    if int(tup[2]) < int(port_split[1]) and int(tup[2]) > int(port_split[0]):
-                        if (self.check_ext_ip(key[1], tup[1])) == True:
-                            if self.pass_rules[key] > line_number:
-                                line_number = self.pass_rules[key]
-                                to_send = True
-                else: 
-                    if port_split[0] == 'any' or port_split[0] == tup[2]:
-                        if (self.check_ext_ip(key[1], tup[1])) == True:
-                            if self.pass_rules[key] > line_number:
-                                line_number = self.pass_rules[key]
-                                to_send = True
+            port_split = key[2].split('-')
+            if len(port_split) == 2:
+                if (int(tup[2]) <= int(port_split[1]) and int(tup[2]) >= int(port_split[0])) and (self.check_ext_ip(key[1], tup[1]) == True) and (key[0] == tup[0]):
+                    # if (self.check_ext_ip(key[1], tup[1])) == True:
+                    if self.pass_rules[key] > line_number:
+                        line_number = self.pass_rules[key]
+                        to_send = True
+            else: 
+                if (port_split[0] == 'any' or int(port_split[0]) == tup[2]) and (self.check_ext_ip(key[1], tup[1]) == True) and (key[0] == tup[0]):
+                    # if (self.check_ext_ip(key[1], tup[1])) == True:
+                    if self.pass_rules[key] > line_number:
+                        line_number = self.pass_rules[key]
+                        to_send = True
+
         if to_send is True:
-            print 'sending int packet: ',
+            print 'sending packet: ',
             print '(%s, %s, %s)' %(tup[0], tup[1], tup[2])
             if pkt_dir == PKT_DIR_INCOMING:
                 self.iface_int.send_ip_packet(pkt)
             else:
                 self.iface_ext.send_ip_packet(pkt)
         else:
-            print 'drop packet: '
+            print 'dropping packet: ',
             print '(%s, %s, %s)' %(tup[0], tup[1], tup[2])
 
     # TODO: You can add more methods as you want.
@@ -202,10 +194,11 @@ class Firewall:
         if len(split) == 2:
             cidr = True
         if cidr == True:
+            #print 'entering cidr'
             comp = ''
             list_of_nums = split[0].split('.')
             for x in list_of_nums:
-                temp = bin(x)
+                temp = bin(int(x))
                 temp1 = temp[2:]
                 if len(temp1) != 8:
                     count = len(temp1)
@@ -216,7 +209,7 @@ class Firewall:
             comp2 = ''
             list_of_nums_2 = pkt_address.split('.')
             for x in list_of_nums_2:
-                temp = bin(x)
+                temp = bin(int(x))
                 temp1 = temp[2:]
                 if len(temp1) != 8:
                     count = len(temp1)
@@ -235,44 +228,43 @@ class Firewall:
                 return True
             elif len(key) == 2:
                 list_1 = self.geo[key]
+                #print "binary_search:"
+                #print self.binary_search(list_1, pkt_address)
                 return self.binary_search(list_1, pkt_address)
             else:
                 return False 
 
     def binary_search(self, array, pkt_address):
-            if len(array) == 0:
-                return False
+        mid = int(len(array)/2)
+        split_pkt_address = pkt_address.split('.')
+        pkt_address_num = (int(split_pkt_address[0]) < 24) + (int(split_pkt_address[1]) << 16) + (int(split_pkt_address[2]) << 8) + int(split_pkt_address[3])
+        #packet ip address
+        mid_start = array[mid][0]
+        mid_end = array[mid][1]
 
-            mid = int(len(array)/2)
-            split_pkt_address = pkt_address.split('.')
-            pkt_address_num = ''
-            #packet ip address
-            for x in split_pkt_address:
-                pkt_address_num += x
+        #middle array start address
+        mid_start_split = mid_start.split('.')
+        mid_start_num = (int(mid_start_split[0]) < 24) + (int(mid_start_split[1]) << 16) + (int(mid_start_split[2]) << 8) + int(mid_start_split[3])
+        
 
-            mid_start = array[mid][0]
-            mid_end = array[mid][1]
+        #middle array end address
+        mid_end_split = mid_end.split('.')
+        mid_end_num = (int(mid_end_split[0]) < 24) + (int(mid_end_split[1]) << 16) + (int(mid_end_split[2]) << 8) + int(mid_end_split[3])
 
-            #middle array start address
-            mid_start_split = mid_start.split('.')
-            mid_start_num = ''
-            for x in mid_start_split:
-                mid_start_num += x
 
-            #middle array end address
-            mid_end_split = mid_end.split('.')
-            mid_end_num = ''
-            for x in mid_end_split:
-                mid_end_num += x
-
+        if len(array) == 1:
+            # print array[mid]
+            return pkt_address_num >= mid_start_num and pkt_address_num <= mid_end_num
+        else:
             # check if it has been found
-            if int(pkt_address_num) >= int(mid_start_num) and int(pkt_address_num) <= int(mid_end_num):
+            if pkt_address_num >= mid_start_num and pkt_address_num <= mid_end_num:
+                # print array[mid]
                 return True
             # smaller than the start range
-            elif int(pkt_address_num) < int(mid_start_num):
+            elif pkt_address_num < mid_start_num:
                 return self.binary_search(array[0:mid], pkt_address)
             # greater than end range
-            elif int(pkt_address_num) > int(mid_end_num):
+            elif pkt_address_num > mid_end_num:
                 return self.binary_search(array[mid:], pkt_address)
             else:
                 return False
@@ -287,18 +279,13 @@ class Firewall:
                 split_check_domain = check_domain.split('.')
                 if split_check_domain[0] == '*':
                     start = len(domain_name) - (len(split_check_domain) - 1) 
-                    print "domain_name"
-                    print domain_name[start:]
-                    print "check_domain"
-                    print split_check_domain[1:]
                     if domain_name[0] == split_check_domain[1]:
                         to_send = True
-                        print "does not match" 
                     elif domain_name[start:] == split_check_domain[1:]:
                         if self.drop_rules[key] > line_number:
                             line_number = self.drop_rules[key]
                             to_send = False
-                            print "in drop rule"
+                            # print "in drop rule"
                 else:
                     if domain_name == split_check_domain:
                         if self.drop_rules[key] > line_number:
@@ -310,8 +297,10 @@ class Firewall:
                 check_domain = key[1]
                 split_check_domain = check_domain.split('.')
                 if split_check_domain[0] == '*':
-                    start = len(domain_name) - (len(split_check_domain) - 1) 
-                    if domain_name[start:] == split_check_domain[1:]:
+                    start = len(domain_name) - (len(split_check_domain) - 1)
+                    if domain_name[0] == split_check_domain[1]:
+                        to_send = False 
+                    elif domain_name[start:] == split_check_domain[1:]:
                         if self.pass_rules[key] > line_number:
                             line_number = self.pass_rules[key]
                             to_send = True
@@ -321,13 +310,13 @@ class Firewall:
                             line_number = self.pass_rules[key]
                             to_send = True
         if to_send is True:
-            print "sending packet: ", 
-            print domain_name
+            #print "sending packet: ", 
+            #print domain_name
             if pkt_dir == PKT_DIR_INCOMING:
                 self.iface_int.send_ip_packet(pkt)
             else:
                 self.iface_ext.send_ip_packet(pkt)
-        else:
-            print 'dropping packet: ',
-            print domain_name
-# TODO: You may want to add more classes/functions as well.
+        #else:
+            #print 'dropping packet: ',
+            #print domain_name
+# TODO: You may want to add more classes/functions as well. 
