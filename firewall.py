@@ -278,14 +278,17 @@ class Firewall:
                 check_domain = key[1]
                 split_check_domain = check_domain.split('.')
                 if split_check_domain[0] == '*':
-                    start = len(domain_name) - (len(split_check_domain) - 1) 
-                    if domain_name[0] == split_check_domain[1]:
-                        to_send = True
-                    elif domain_name[start:] == split_check_domain[1:]:
-                        if self.drop_rules[key] > line_number:
-                            line_number = self.drop_rules[key]
-                            to_send = False
-                            # print "in drop rule"
+                    if len(split_check_domain) == 1:
+                        to_send = False
+                    else:
+                        start = len(domain_name) - (len(split_check_domain) - 1) 
+                        if domain_name[0] == split_check_domain[1]:
+                            to_send = True
+                        elif domain_name[start:] == split_check_domain[1:]:
+                            if self.drop_rules[key] > line_number:
+                                line_number = self.drop_rules[key]
+                                to_send = False
+                                # print "in drop rule"
                 else:
                     if domain_name == split_check_domain:
                         if self.drop_rules[key] > line_number:
@@ -297,26 +300,29 @@ class Firewall:
                 check_domain = key[1]
                 split_check_domain = check_domain.split('.')
                 if split_check_domain[0] == '*':
-                    start = len(domain_name) - (len(split_check_domain) - 1)
-                    if domain_name[0] == split_check_domain[1]:
-                        to_send = False 
-                    elif domain_name[start:] == split_check_domain[1:]:
-                        if self.pass_rules[key] > line_number:
-                            line_number = self.pass_rules[key]
-                            to_send = True
+                    if len(split_check_domain) == 1:
+                        to_send = True
+                    else:
+                        start = len(domain_name) - (len(split_check_domain) - 1)
+                        if domain_name[0] == split_check_domain[1]:
+                            to_send = False 
+                        elif domain_name[start:] == split_check_domain[1:]:
+                            if self.pass_rules[key] > line_number:
+                                line_number = self.pass_rules[key]
+                                to_send = True
                 else:
                     if domain_name == split_check_domain:
                         if self.pass_rules[key] > line_number:
                             line_number = self.pass_rules[key]
                             to_send = True
         if to_send is True:
-            #print "sending packet: ", 
-            #print domain_name
+            print "sending packet: ", 
+            print domain_name
             if pkt_dir == PKT_DIR_INCOMING:
                 self.iface_int.send_ip_packet(pkt)
             else:
                 self.iface_ext.send_ip_packet(pkt)
-        #else:
-            #print 'dropping packet: ',
-            #print domain_name
+        else:
+            print 'dropping packet: ',
+            print domain_name
 # TODO: You may want to add more classes/functions as well. 
